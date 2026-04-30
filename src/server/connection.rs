@@ -4905,6 +4905,11 @@ async fn start_ipc(
         #[cfg(target_os = "linux")]
         let mut user = None;
 
+        // Use headless CM when approve mode is password-only (no user interaction needed)
+        if password::approve_mode() == ApproveMode::Password {
+            args = vec!["--cm-no-ui"];
+        }
+
         // Cm run as user, wait until desktop session is ready.
         #[cfg(target_os = "linux")]
         if crate::platform::is_headless_allowed() && linux_desktop_manager::is_headless() {
