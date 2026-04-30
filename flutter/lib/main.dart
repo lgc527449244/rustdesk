@@ -291,13 +291,17 @@ void runConnectionManagerScreen() async {
   final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
   final hideByPasswordMode = approveMode == 'password';
   final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
-  gFFI.serverModel.hideCm = hide || hideByPasswordMode;
+  final shouldHide = hide || hideByPasswordMode;
+  gFFI.serverModel.hideCm = shouldHide;
+  if (shouldHide) {
+    await windowManager.setOpacity(0);
+  }
   _runApp(
     '',
     const DesktopServerPage(),
     MyTheme.currentThemeMode(),
   );
-  if (hide || hideByPasswordMode) {
+  if (shouldHide) {
     await hideCmWindow(isStartup: true);
   } else {
     await showCmWindow(isStartup: true);
