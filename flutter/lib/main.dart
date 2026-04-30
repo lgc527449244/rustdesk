@@ -294,18 +294,16 @@ void runConnectionManagerScreen() async {
   final shouldHide = hide || hideByPasswordMode;
   gFFI.serverModel.hideCm = shouldHide;
   if (shouldHide) {
-    await windowManager.setOpacity(0);
+    // Keep process alive for IPC without creating any Flutter UI
+    await Completer<void>().future;
+    return;
   }
   _runApp(
     '',
     const DesktopServerPage(),
     MyTheme.currentThemeMode(),
   );
-  if (shouldHide) {
-    await hideCmWindow(isStartup: true);
-  } else {
-    await showCmWindow(isStartup: true);
-  }
+  await showCmWindow(isStartup: true);
   setResizable(false);
   // Start the uni links handler and redirect links to Native, not for Flutter.
   listenUniLinks(handleByFlutter: false);
