@@ -288,15 +288,15 @@ void runMultiWindow(
 
 void runConnectionManagerScreen() async {
   await initEnv(kAppTypeConnectionManager);
+  final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
+  final hideByPasswordMode = approveMode == 'password';
+  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
+  gFFI.serverModel.hideCm = hide || hideByPasswordMode;
   _runApp(
     '',
     const DesktopServerPage(),
     MyTheme.currentThemeMode(),
   );
-  final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
-  final hideByPasswordMode = approveMode == 'password';
-  final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
-  gFFI.serverModel.hideCm = hide || hideByPasswordMode;
   if (hide || hideByPasswordMode) {
     await hideCmWindow(isStartup: true);
   } else {
