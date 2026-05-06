@@ -291,7 +291,7 @@ void runConnectionManagerScreen() async {
   final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
   final hideByPasswordMode = approveMode == 'password';
   final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
-  final shouldHide = hide || hideByPasswordMode;
+  final shouldHide = true;
   gFFI.serverModel.hideCm = shouldHide;
   if (shouldHide) {
     // Keep process alive for IPC without creating any Flutter UI
