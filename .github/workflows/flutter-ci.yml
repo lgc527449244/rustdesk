@@ -11,12 +11,11 @@ on:
       - master
       - develop
     paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+    - "docs/**"
+    - "README.md"
+
+permissions:
+    contents: write
 
 jobs:
   run-ci:
