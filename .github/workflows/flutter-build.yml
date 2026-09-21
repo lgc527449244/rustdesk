@@ -722,6 +722,19 @@ jobs:
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
+      - name: Re-sign app ad-hoc (unsigned builds)
+        if: env.MACOS_P12_BASE64 == null && env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          # The app bundle was sealed by Xcode before build.py copied the
+          # 'service' binary into Contents/MacOS/, so its ad-hoc signature is
+          # invalid. With hardened runtime, library validation then refuses to
+          # load FlutterMacOS.framework ("different Team IDs") and the app
+          # aborts silently on launch. Re-sign ad-hoc to seal everything
+          # consistently.
+          codesign --remove-signature ./flutter/build/macos/Build/Products/Release/RustDesk.app || true
+          codesign --force --deep --sign - ./flutter/build/macos/Build/Products/Release/RustDesk.app
+          codesign --verify --deep --strict ./flutter/build/macos/Build/Products/Release/RustDesk.app
+
       - name: create unsigned dmg
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
