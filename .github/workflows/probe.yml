@@ -6,7 +6,5 @@ on:
   workflow_dispatch:
 
 jobs:
-  hello:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo hello from probe
+  call-minimal-callee:
+    uses: ./.github/workflows/probe-callee.yml
