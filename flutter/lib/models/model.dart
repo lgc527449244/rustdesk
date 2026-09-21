@@ -3602,6 +3602,18 @@ class FFI {
   var connType = ConnType.defaultConn;
   var closed = false;
 
+  /// Optional headless event hook.
+  ///
+  /// When non-null (must be set before [start] is called) every decoded
+  /// event from the session stream is first passed to this callback.
+  /// Returning `true` consumes the event so the default `cb(event)`
+  /// dispatch is skipped. This is used by headless file-transfer
+  /// sessions — for example the batch sender — to swallow password
+  /// prompts, auto-answer overwrite confirmations and own the
+  /// `job_progress`/`job_done` state machine without ever showing a UI
+  /// dialog.
+  bool Function(Map<String, dynamic> evt)? headlessEventHook;
+
   /// dialogManager use late to ensure init after main page binding [globalKey]
   late final dialogManager = OverlayDialogManager();
 
@@ -3836,7 +3848,10 @@ class FFI {
             debugPrint('json.decode fail1(): $e, ${message.field0}');
           }
           if (event != null) {
-            await cb(event);
+            final hook = headlessEventHook;
+            if (hook == null || !hook(event)) {
+              await cb(event);
+            }
           }
         } else if (message is EventToUI_Rgba) {
           final display = message.field0;

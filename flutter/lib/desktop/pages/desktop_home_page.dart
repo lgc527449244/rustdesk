@@ -93,6 +93,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       buildTip(context),
       if (!isOutgoingOnly) buildIDBoard(context),
       if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isIncomingOnly) buildBatchSendEntry(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -384,6 +385,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget buildBatchSendEntry(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20.0, right: 16.0, top: 10.0),
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.forward_to_inbox_outlined, size: 18.0),
+        label: Text(translate('Batch Send')),
+        onPressed: DesktopTabPage.onAddBatchSend,
       ),
     );
   }

@@ -207,6 +207,7 @@ const String kUrlActionClose = "close";
 
 const String kTabLabelHomePage = "Home";
 const String kTabLabelSettingPage = "Settings";
+const String kTabLabelBatchSendPage = "Batch Send";
 
 const String kWindowPrefix = "wm_";
 const int kWindowMainId = 0;

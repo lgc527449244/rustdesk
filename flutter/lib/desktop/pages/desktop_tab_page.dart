@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
+import 'package:flutter_hbb/desktop/pages/batch_send_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
@@ -30,6 +31,22 @@ class DesktopTabPage extends StatefulWidget {
           page: DesktopSettingPage(
             key: const ValueKey(kTabLabelSettingPage),
             initialTabkey: initialPage,
+          )));
+    } catch (e) {
+      debugPrintStack(label: '$e');
+    }
+  }
+
+  static void onAddBatchSend() {
+    try {
+      DesktopTabController tabController = Get.find<DesktopTabController>();
+      tabController.add(TabInfo(
+          key: kTabLabelBatchSendPage,
+          label: kTabLabelBatchSendPage,
+          selectedIcon: Icons.forward_to_inbox_sharp,
+          unselectedIcon: Icons.forward_to_inbox_outlined,
+          page: BatchSendPage(
+            key: const ValueKey(kTabLabelBatchSendPage),
           )));
     } catch (e) {
       debugPrintStack(label: '$e');
