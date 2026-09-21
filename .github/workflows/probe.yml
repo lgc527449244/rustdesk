@@ -6,5 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  call-minimal-callee:
-    uses: ./.github/workflows/probe-callee.yml
+  call-real-build:
+    uses: ./.github/workflows/flutter-build.yml
+    with:
+      upload-artifact: false
