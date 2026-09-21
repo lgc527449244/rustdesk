@@ -1,0 +1,12 @@
+name: Probe
+
+on:
+  push:
+    branches: [develop-bisect]
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hello from probe
