@@ -10,19 +10,14 @@ on:
     branches:
       - master
       - develop
+      - develop-bisect
     paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+    - "docs/**"
+    - "README.md"
 
 jobs:
   run-ci:
     uses: ./.github/workflows/flutter-build.yml
     with:
       upload-artifact: true
-      # develop pushes publish to a separate "develop" release tag so they
-      # don't clobber the nightly artifacts built from master.
-      upload-tag: ${{ github.ref_name == 'develop' && 'develop' || 'nightly' }}
+      upload-tag: "develop"
