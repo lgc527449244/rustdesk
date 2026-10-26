@@ -93,7 +93,6 @@ pub mod input {
 }
 
 lazy_static::lazy_static! {
-    pub static ref SOFTWARE_UPDATE_URL: Arc<Mutex<String>> = Default::default();
     pub static ref DEVICE_ID: Arc<Mutex<String>> = Default::default();
     pub static ref DEVICE_NAME: Arc<Mutex<String>> = Default::default();
     static ref PUBLIC_IPV6_ADDR: Arc<Mutex<(Option<SocketAddr>, Option<Instant>)>> = Default::default();
@@ -561,12 +560,14 @@ audio_rechannel!(audio_rechannel_8_7, 8, 7);
 
 pub struct CheckTestNatType {
     is_direct: bool,
+    rendezvous_server: String,
 }
 
 impl CheckTestNatType {
     pub fn new() -> Self {
         Self {
             is_direct: Config::get_socks().is_none() && !config::use_ws(),
+            rendezvous_server: configured_rendezvous_server(),
         }
     }
 }
@@ -574,13 +575,21 @@ impl CheckTestNatType {
 impl Drop for CheckTestNatType {
     fn drop(&mut self) {
         let is_direct = Config::get_socks().is_none() && !config::use_ws();
-        if self.is_direct != is_direct {
+        let server_changed = self.rendezvous_server != configured_rendezvous_server();
+        if self.is_direct != is_direct || server_changed {
             test_nat_type();
+        }
+        #[cfg(target_os = "android")]
+        if server_changed {
+            crate::RendezvousMediator::restart();
         }
     }
 }
 
 pub fn test_nat_type() {
+    if configured_rendezvous_server().is_empty() {
+        return;
+    }
     test_ipv6_sync();
     use std::sync::atomic::{AtomicBool, Ordering};
     std::thread::spawn(move || {
@@ -626,7 +635,10 @@ pub fn test_nat_type() {
 async fn test_nat_type_() -> ResultType<bool> {
     log::info!("Testing nat ...");
     let start = std::time::Instant::now();
-    let server1 = Config::get_rendezvous_server();
+    let server1 = configured_rendezvous_server();
+    if server1.is_empty() {
+        return Ok(true);
+    }
     let server2 = crate::increase_port(&server1, -1);
     let mut msg_out = RendezvousMessage::new();
     let serial = Config::get_serial();
@@ -683,6 +695,30 @@ async fn test_nat_type_() -> ResultType<bool> {
     Ok(ok)
 }
 
+/// Only explicitly configured ID servers may be contacted. In particular, do not
+/// reuse Config's cached public server or its built-in rendezvous server list.
+pub fn configured_rendezvous_server() -> String {
+    let mut server = config::EXE_RENDEZVOUS_SERVER.read().unwrap().clone();
+    if server.is_empty() {
+        server = get_custom_rendezvous_server(Config::get_option("custom-rendezvous-server"));
+    }
+    let server = server.trim();
+    if server.is_empty() {
+        String::new()
+    } else {
+        check_port(server, RENDEZVOUS_PORT)
+    }
+}
+
+pub fn configured_rendezvous_servers() -> Vec<String> {
+    let server = configured_rendezvous_server();
+    if server.is_empty() {
+        Vec::new()
+    } else {
+        vec![server]
+    }
+}
+
 pub async fn get_rendezvous_server(ms_timeout: u64) -> (String, Vec<String>, bool) {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let (mut a, mut b) = get_rendezvous_server_(ms_timeout);
@@ -696,6 +732,7 @@ pub async fn get_rendezvous_server(ms_timeout: u64) -> (String, Vec<String>, boo
     }
     let mut b: Vec<String> = b
         .drain(..)
+        .filter(|x| !x.trim().is_empty())
         .map(|x| socket_client::check_port(x, config::RENDEZVOUS_PORT))
         .collect();
     let c = if b.contains(&a) {
@@ -712,8 +749,8 @@ pub async fn get_rendezvous_server(ms_timeout: u64) -> (String, Vec<String>, boo
 #[cfg(any(target_os = "android", target_os = "ios"))]
 fn get_rendezvous_server_(_ms_timeout: u64) -> (String, Vec<String>) {
     (
-        Config::get_rendezvous_server(),
-        Config::get_rendezvous_servers(),
+        configured_rendezvous_server(),
+        configured_rendezvous_servers(),
     )
 }
 
@@ -738,7 +775,7 @@ pub async fn get_nat_type(ms_timeout: u64) -> i32 {
 // used for client to test which server is faster in case stop-servic=Y
 #[tokio::main(flavor = "current_thread")]
 async fn test_rendezvous_server_() {
-    let servers = Config::get_rendezvous_servers();
+    let servers = configured_rendezvous_servers();
     if servers.len() <= 1 {
         return;
     }
@@ -939,67 +976,6 @@ pub fn is_modifier(evt: &KeyEvent) -> bool {
     }
 }
 
-pub fn check_software_update() {
-    if is_custom_client() {
-        return;
-    }
-    let opt = LocalConfig::get_option(keys::OPTION_ENABLE_CHECK_UPDATE);
-    if config::option2bool(keys::OPTION_ENABLE_CHECK_UPDATE, &opt) {
-        std::thread::spawn(move || allow_err!(do_check_software_update()));
-    }
-}
-
-// No need to check `danger_accept_invalid_cert` for now.
-// Because the url is always `https://api.rustdesk.com/version/latest`.
-#[tokio::main(flavor = "current_thread")]
-pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
-    let (request, url) =
-        hbb_common::version_check_request(hbb_common::VER_TYPE_RUSTDESK_CLIENT.to_string());
-    let proxy_conf = Config::get_socks();
-    let tls_url = get_url_for_tls(&url, &proxy_conf);
-    let tls_type = get_cached_tls_type(tls_url);
-    let is_tls_not_cached = tls_type.is_none();
-    let tls_type = tls_type.unwrap_or(TlsType::Rustls);
-    let client = create_http_client_async(tls_type, false);
-    let latest_release_response = match client.post(&url).json(&request).send().await {
-        Ok(resp) => {
-            upsert_tls_cache(tls_url, tls_type, false);
-            resp
-        }
-        Err(err) => {
-            if is_tls_not_cached && err.is_request() {
-                let tls_type = TlsType::NativeTls;
-                let client = create_http_client_async(tls_type, false);
-                let resp = client.post(&url).json(&request).send().await?;
-                upsert_tls_cache(tls_url, tls_type, false);
-                resp
-            } else {
-                return Err(err.into());
-            }
-        }
-    };
-    let bytes = latest_release_response.bytes().await?;
-    let resp: hbb_common::VersionCheckResponse = serde_json::from_slice(&bytes)?;
-    let response_url = resp.url;
-    let latest_release_version = response_url.rsplit('/').next().unwrap_or_default();
-
-    if get_version_number(&latest_release_version) > get_version_number(crate::VERSION) {
-        #[cfg(feature = "flutter")]
-        {
-            let mut m = HashMap::new();
-            m.insert("name", "check_software_update_finish");
-            m.insert("url", &response_url);
-            if let Ok(data) = serde_json::to_string(&m) {
-                let _ = crate::flutter::push_global_event(crate::flutter::APP_TYPE_MAIN, data);
-            }
-        }
-        *SOFTWARE_UPDATE_URL.lock().unwrap() = response_url;
-    } else {
-        *SOFTWARE_UPDATE_URL.lock().unwrap() = "".to_string();
-    }
-    Ok(())
-}
-
 #[inline]
 pub fn get_app_name() -> String {
     hbb_common::config::APP_NAME.read().unwrap().clone()
@@ -1108,7 +1084,7 @@ pub fn get_local_option(key: &str) -> String {
     let v = LocalConfig::get_option(key);
     if key == keys::OPTION_ENABLE_UDP_PUNCH || key == keys::OPTION_ENABLE_IPV6_PUNCH {
         if v.is_empty() {
-            if !is_public(&Config::get_rendezvous_server()) {
+            if !is_public(&configured_rendezvous_server()) {
                 return "N".to_owned();
             }
         }
@@ -1182,7 +1158,7 @@ fn tcp_proxy_log_target(url: &str) -> String {
 
 #[inline]
 fn get_tcp_proxy_addr() -> String {
-    check_port(Config::get_rendezvous_server(), RENDEZVOUS_PORT)
+    configured_rendezvous_server()
 }
 
 /// Send an HTTP request via the rendezvous server's TCP proxy using protobuf.

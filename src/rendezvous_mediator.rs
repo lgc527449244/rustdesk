@@ -65,10 +65,6 @@ impl RendezvousMediator {
             }
         }
         crate::hbbs_http::sync::start();
-        #[cfg(target_os = "windows")]
-        if crate::platform::is_installed() && crate::is_server() {
-            crate::updater::start_auto_update();
-        }
         check_zombie();
         let server = new_server();
         if config::option2bool("stop-service", &Config::get_option("stop-service")) {
@@ -101,7 +97,7 @@ impl RendezvousMediator {
                 && !crate::platform::installing_service()
             {
                 let mut futs = Vec::new();
-                let servers = Config::get_rendezvous_servers();
+                let servers = crate::configured_rendezvous_servers();
                 SHOULD_EXIT.store(false, Ordering::SeqCst);
                 MANUAL_RESTARTED.store(false, Ordering::SeqCst);
                 for host in servers.clone() {
@@ -324,13 +320,13 @@ impl RendezvousMediator {
                 });
             }
             Some(rendezvous_message::Union::ConfigureUpdate(cu)) => {
-                let v0 = Config::get_rendezvous_servers();
+                let v0 = crate::configured_rendezvous_servers();
                 Config::set_option(
                     "rendezvous-servers".to_owned(),
                     cu.rendezvous_servers.join(","),
                 );
                 Config::set_serial(cu.serial);
-                if v0 != Config::get_rendezvous_servers() {
+                if v0 != crate::configured_rendezvous_servers() {
                     Self::restart();
                 }
             }

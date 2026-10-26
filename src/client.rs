@@ -48,7 +48,7 @@ use hbb_common::{
     bail,
     config::{
         self, keys, use_ws, Config, LocalConfig, PeerConfig, PeerInfoSerde, Resolution,
-        CONNECT_TIMEOUT, READ_TIMEOUT, RELAY_PORT, RENDEZVOUS_PORT, RENDEZVOUS_SERVERS,
+        CONNECT_TIMEOUT, READ_TIMEOUT, RELAY_PORT, RENDEZVOUS_PORT,
     },
     fs::JobType,
     futures::future::{select_ok, FutureExt},
@@ -293,18 +293,15 @@ impl Client {
             crate::get_rendezvous_server(1_000).await
         } else {
             if other_server == PUBLIC_SERVER {
-                (
-                    check_port(RENDEZVOUS_SERVERS[0], RENDEZVOUS_PORT),
-                    RENDEZVOUS_SERVERS[1..]
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect(),
-                    true,
-                )
+                bail!("Public ID server is disabled. Configure your own ID server.");
             } else {
                 (check_port(other_server, RENDEZVOUS_PORT), Vec::new(), true)
             }
         };
+
+        if rendezvous_server.is_empty() {
+            bail!("ID server is not configured. Configure an ID server in Settings > Network.");
+        }
 
         if crate::get_ipv6_punch_enabled() {
             crate::test_ipv6().await;
@@ -2623,8 +2620,13 @@ impl LoginConfigHandler {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let my_id = Config::get_id();
         let (my_id, pure_id) = if let Some((id, _, _)) = self.other_server.as_ref() {
-            let server = Config::get_rendezvous_server();
-            (format!("{my_id}@{server}"), id.clone())
+            let server = crate::configured_rendezvous_server();
+            let my_id = if server.is_empty() {
+                my_id
+            } else {
+                format!("{my_id}@{server}")
+            };
+            (my_id, id.clone())
         } else {
             (my_id, self.id.clone())
         };

@@ -473,7 +473,7 @@ impl CheckIfRestart {
     pub fn new() -> CheckIfRestart {
         CheckIfRestart {
             stop_service: Config::get_option("stop-service"),
-            rendezvous_servers: Config::get_rendezvous_servers(),
+            rendezvous_servers: crate::configured_rendezvous_servers(),
             audio_input: Config::get_option("audio-input"),
             voice_call_input: Config::get_option("voice-call-input"),
             ws: Config::get_option(OPTION_ALLOW_WEBSOCKET),
@@ -494,7 +494,7 @@ impl Drop for CheckIfRestart {
             != Config::get_option(config::keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK);
         if allow_insecure_tls_fallback_changed
             || self.stop_service != Config::get_option("stop-service")
-            || self.rendezvous_servers != Config::get_rendezvous_servers()
+            || self.rendezvous_servers != crate::configured_rendezvous_servers()
             || self.ws != Config::get_option(OPTION_ALLOW_WEBSOCKET)
             || self.disable_udp != Config::get_option(config::keys::OPTION_DISABLE_UDP)
             || self.api_server != Config::get_option("api-server")
@@ -660,11 +660,11 @@ async fn handle(data: Data, stream: &mut Connection) {
                 } else if name == "rendezvous_server" {
                     value = Some(format!(
                         "{},{}",
-                        Config::get_rendezvous_server(),
-                        Config::get_rendezvous_servers().join(",")
+                        crate::configured_rendezvous_server(),
+                        crate::configured_rendezvous_servers().join(",")
                     ));
                 } else if name == "rendezvous_servers" {
-                    value = Some(Config::get_rendezvous_servers().join(","));
+                    value = Some(crate::configured_rendezvous_servers().join(","));
                 } else if name == "fingerprint" {
                     value = if Config::get_key_confirmed() {
                         Some(crate::common::pk_to_fingerprint(Config::get_key_pair().1))
@@ -744,6 +744,7 @@ async fn handle(data: Data, stream: &mut Connection) {
         Data::SyncConfig(Some(configs)) => {
             let (config, config2) = *configs;
             let _chk = CheckIfRestart::new();
+            let _nat = CheckTestNatType::new();
             Config::set(config);
             Config2::set(config2);
             allow_err!(stream.send(&Data::SyncConfig(None)).await);
@@ -796,9 +797,8 @@ async fn handle(data: Data, stream: &mut Connection) {
             feature = "flutter",
             not(any(target_os = "android", target_os = "ios"))
         ))]
-        Data::ControllingSessionCount(count) => {
-            crate::updater::update_controlling_session_count(count);
-        }
+        // Kept for IPC compatibility; there is no background updater to notify.
+        Data::ControllingSessionCount(_) => {}
         #[cfg(target_os = "linux")]
         Data::TerminalSessionCount(_) => {
             let count = crate::terminal_service::get_terminal_session_count(true);
@@ -1356,12 +1356,15 @@ pub async fn get_rendezvous_server(ms_timeout: u64) -> (String, Vec<String>) {
     if let Ok(Some(v)) = get_config_async("rendezvous_server", ms_timeout).await {
         let mut urls = v.split(",");
         let a = urls.next().unwrap_or_default().to_owned();
-        let b: Vec<String> = urls.map(|x| x.to_owned()).collect();
+        let b: Vec<String> = urls
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| x.to_owned())
+            .collect();
         (a, b)
     } else {
         (
-            Config::get_rendezvous_server(),
-            Config::get_rendezvous_servers(),
+            crate::configured_rendezvous_server(),
+            crate::configured_rendezvous_servers(),
         )
     }
 }
@@ -1436,9 +1439,13 @@ pub async fn get_nat_type(ms_timeout: u64) -> i32 {
 
 pub async fn get_rendezvous_servers(ms_timeout: u64) -> Vec<String> {
     if let Ok(Some(v)) = get_config_async("rendezvous_servers", ms_timeout).await {
-        return v.split(',').map(|x| x.to_owned()).collect();
+        return v
+            .split(',')
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| x.to_owned())
+            .collect();
     }
-    return Config::get_rendezvous_servers();
+    return crate::configured_rendezvous_servers();
 }
 
 #[inline]

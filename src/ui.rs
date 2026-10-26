@@ -102,7 +102,6 @@ pub fn start(args: &mut [String]) {
     }
     if args.is_empty() {
         std::thread::spawn(move || check_zombie());
-        crate::common::check_software_update();
         frame.event_handler(UI {});
         frame.sciter_handler(UIHostHandler {});
         page = "index.html";
@@ -514,7 +513,7 @@ impl UI {
     }
 
     fn get_software_update_url(&self) -> String {
-        crate::SOFTWARE_UPDATE_URL.lock().unwrap().clone()
+        String::new()
     }
 
     fn get_new_version(&self) -> String {
@@ -545,14 +544,7 @@ impl UI {
 
     fn get_software_store_path(&self) -> String {
         let mut p = std::env::temp_dir();
-        let name = crate::SOFTWARE_UPDATE_URL
-            .lock()
-            .unwrap()
-            .split("/")
-            .last()
-            .map(|x| x.to_owned())
-            .unwrap_or(crate::get_app_name());
-        p.push(name);
+        p.push(crate::get_app_name());
         format!("{}.{}", p.to_string_lossy(), self.get_software_ext())
     }
 

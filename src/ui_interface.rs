@@ -23,7 +23,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::common::SOFTWARE_UPDATE_URL;
 #[cfg(feature = "flutter")]
 use crate::hbbs_http::account;
 #[cfg(not(any(target_os = "ios")))]
@@ -415,7 +414,10 @@ pub fn set_options(m: HashMap<String, String>) {
         ipc::set_options(m).ok();
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    Config::set_options(m);
+    {
+        let _nat = crate::CheckTestNatType::new();
+        Config::set_options(m);
+    }
 }
 
 #[inline]
@@ -749,13 +751,8 @@ pub fn current_is_wayland() -> bool {
 
 #[inline]
 pub fn get_new_version() -> String {
-    (*SOFTWARE_UPDATE_URL
-        .lock()
-        .unwrap()
-        .rsplit('/')
-        .next()
-        .unwrap_or(""))
-    .to_string()
+    // Kept for UI/bridge compatibility. No remote version is fetched.
+    String::new()
 }
 
 #[inline]
@@ -1399,7 +1396,11 @@ pub async fn change_id_shared_(id: String, old_id: String) -> &'static str {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let rendezvous_servers = crate::ipc::get_rendezvous_servers(1_000).await;
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    let rendezvous_servers = Config::get_rendezvous_servers();
+    let rendezvous_servers = crate::configured_rendezvous_servers();
+
+    if rendezvous_servers.is_empty() {
+        return "ID server is not configured. Configure an ID server in Settings > Network.";
+    }
 
     let mut futs = Vec::new();
     let err: Arc<Mutex<&str>> = Default::default();

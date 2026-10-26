@@ -55,6 +55,8 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Hardware Codec", "硬件编解码"),
         ("Adaptive bitrate", "自适应码率"),
         ("ID Server", "ID 服务器"),
+        ("ID server is not configured. Configure an ID server in Settings > Network.", "尚未配置 ID 服务器，请在“设置 > 网络”中配置。"),
+        ("Public ID server is disabled. Configure your own ID server.", "已禁用公共 ID 服务器，请配置自己的 ID 服务器。"),
         ("Relay Server", "中继服务器"),
         ("API Server", "API 服务器"),
         ("invalid_http", "必须以 http:// 或者 https:// 开头"),
